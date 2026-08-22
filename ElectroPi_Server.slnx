@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="ElectroPi.Api/ElectroPi.Api.csproj" />
+  <Project Path="ElectroPi.Application/ElectroPi.Application.csproj" />
+  <Project Path="ElectroPi.Domain/ElectroPi.Domain.csproj" />
+  <Project Path="ElectroPi.Infrastructure/ElectroPi.Infrastructure.csproj" />
+</Solution>
