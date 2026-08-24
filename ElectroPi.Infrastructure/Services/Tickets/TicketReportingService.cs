@@ -20,6 +20,7 @@ namespace ElectroPi.Infrastructure.Services.Tickets
             var tickets = await _dbContext.Tickets
                 .AsQueryable()
                 .AsNoTracking()
+                .Include(t => t.Agent)
                 .ToListAsync();
 
             var resolvedTickets = tickets

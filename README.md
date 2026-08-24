@@ -4,7 +4,7 @@ Backend API for the **ElectroPi Support Ticket Management System** — a technic
 
 Built with **ASP.NET Core 10 Web API**, **EF Core 10 / SQL Server**, **ASP.NET Core Identity**, and a layered **Clean Architecture** (Domain → Application → Infrastructure → Api).
 
-> Companion frontend: [`ElectroPi_Client`](../ElectroPi_Client) (Angular 21).
+> Companion frontend: [`ElectroPi_Client`](https://github.com/abdofathy883/ElectroPi_Client) (Angular 21).
 
 ---
 
@@ -24,7 +24,6 @@ Built with **ASP.NET Core 10 Web API**, **EF Core 10 / SQL Server**, **ASP.NET C
 - [CI/CD](#cicd)
 - [Project Structure](#project-structure)
 - [Assumptions & Known Limitations](#assumptions--known-limitations)
-- [Screenshots](#screenshots)
 - [Demo Video](#demo-video)
 
 ---
@@ -244,7 +243,7 @@ Base path: `/api`. All endpoints require a valid JWT unless marked **Anonymous**
 
 `GET /api/ticketreporting` returns: total/open/in-progress/resolved/closed ticket counts, open **critical** ticket count, average resolution time (hours, from creation to resolution), and a per-agent active-ticket workload breakdown — rendered on the frontend as a doughnut (status mix) and bar chart (agent workload).
 
-A ready-to-import **Postman collection** / the raw OpenAPI JSON is the authoritative, always-up-to-date source of truth for request/response shapes — see [Screenshots](#screenshots) for where the exported collection is linked.
+A ready-to-import **Postman collection** / the raw OpenAPI JSON is the authoritative, always-up-to-date source of truth for request/response shapes.
 
 ## Business Rules
 
@@ -337,19 +336,10 @@ Documented transparently, per the assessment's requirement to call out incomplet
 - **CI pipeline is scaffolded, not production-hardened** — see [CI/CD](#cicd).
 - **No Swagger/Swashbuckle UI** — only the raw OpenAPI JSON document is exposed in Development (`/openapi/v1.json`); a Postman collection is provided instead as the primary way to explore/exercise the API interactively.
 - **`appsettings.json` ships a local dev connection string and JWT key** for reviewer convenience, not real secrets — see the callout in [Configuration](#configuration).
-- **Frontend automated test coverage covers the tickets feature only** — see the note in [`ElectroPi_Client`](../ElectroPi_Client/README.md#testing).
+- **Frontend automated test coverage covers the tickets feature only** — see the note in [`ElectroPi_Client`](https://github.com/abdofathy883/ElectroPi_Client/README.md#testing).
 
-## Screenshots
-
-> _Reserved for the assessment deliverables — add captures of: Swagger/Postman collection overview, login flow, ticket list with filters, ticket detail with comments/timeline, dashboard charts, and a 403 data-isolation example._
-
-| | |
-|---|---|
-| ![Postman collection](docs/screenshots/postman-collection.png) | ![Swagger/OpenAPI](docs/screenshots/openapi.png) |
-| ![Ticket list](docs/screenshots/ticket-list.png) | ![Ticket detail & timeline](docs/screenshots/ticket-detail.png) |
 
 ## Demo Video
 
-> _Reserved — link the short demonstration video (walkthrough of auth, role-based access, ticket lifecycle, dashboard) here once recorded._
 
-**[▶ Watch the demo video](docs/demo-video-link-placeholder)**
+**[▶ Watch the demo video](https://www.loom.com/share/57ab7277ae4a44d39a676e0564a6fbf3)**

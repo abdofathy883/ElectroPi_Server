@@ -172,7 +172,6 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     var dbContext = services.GetRequiredService<AppDbContext>();
     await dbContext.Database.MigrateAsync();
-    await AuthSeeder.SeedAsync(services);
     await DbSeeder.SeedAsync(services);
 }
 
