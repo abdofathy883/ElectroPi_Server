@@ -1,7 +1,9 @@
 ﻿using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using ElectroPi.Application.Dtos.Auth;
 using ElectroPi.Application.Interfaces;
 using ElectroPi.Domain.Entities;
+using ElectroPi.Domain.Enums;
 using ElectroPi.Infrastructure.Persistance;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +14,6 @@ namespace Infrastructure.Identity
     public class AuthService : IAuthService
     {
         private readonly AppDbContext _dbContext;
-        //private readonly MessageQueueService _notificationService;
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IJwtServices _jwtServices;
@@ -23,7 +24,6 @@ namespace Infrastructure.Identity
         private const string CacheKey = "employee_lookup";
         public AuthService(
             AppDbContext dbContext,
-            //MessageQueueService notificationService,
             UserManager<AppUser> userManager,
             RoleManager<IdentityRole> roleManager,
             IJwtServices jwtServices,
@@ -44,20 +44,37 @@ namespace Infrastructure.Identity
                 return cachedUsers!;
 
             var users = await _dbContext.Users
-                //.Include(u => u.Roles)
                 .OrderByDescending(x => x.CreatedAt)
+                .ProjectTo<UserDto>(_mapper.ConfigurationProvider)
                 .ToListAsync();
 
-            //foreach (var user in users)
-            //{
-            //    var roles = await _userManager.GetRolesAsync(user);
-            //    user
-            //}
+            var userIds = users.Select(u => u.Id).ToList();
+
+            var rolesByUserId = await _dbContext.UserRoles
+                .Where(ur => userIds.Contains(ur.UserId))
+                .Join(
+                    _dbContext.Roles,
+                    ur => ur.RoleId,
+                    r => r.Id,
+                    (ur, r) => new
+                    {
+                        ur.UserId,
+                        RoleName = r.Name!
+                    })
+                .ToDictionaryAsync(x => x.UserId, x => x.RoleName);
+
+            var rolesLookup = rolesByUserId
+                .GroupBy(x => x.Key)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Value!).ToList());
+
+            foreach (var user in users)
+                user.Role = rolesByUserId.GetValueOrDefault(user.Id);
+
             var cacheOptions = new MemoryCacheEntryOptions()
                 .SetAbsoluteExpiration(TimeSpan.FromDays(7))
                 .SetSlidingExpiration(TimeSpan.FromHours(24));
 
-            return _mapper.Map<List<UserDto>>(users);
+            return users;
         }
 
         public void Invalidate() => _cache.Remove(CacheKey);
@@ -78,7 +95,7 @@ namespace Infrastructure.Identity
                 FullName = user.FullName,
                 Email = user.Email,
                 PhoneNumber = user.PhoneNumber,
-                Roles = roles.ToList(),
+                Role = roles.First(),
             };
         }
         public async Task<AuthResponseDto> LoginAsync(LoginDto login)
@@ -135,7 +152,7 @@ namespace Infrastructure.Identity
         }
         public async Task<UserDto> RegisterAsync(RegisterDto newUser)
         {
-            var validateErrors = await ValidateRegisterAsync(newUser);
+            var validateErrors = await ValidateRegisterAsync(newUser.FullName, newUser.Email, newUser.PhoneNumber, newUser.Password);
             if (validateErrors is not null && validateErrors.Count > 0)
                 throw new InvalidOperationException(string.Join(", ", validateErrors));
 
@@ -248,47 +265,81 @@ namespace Infrastructure.Identity
             return true;
         }
 
-        public async Task<List<string>> ValidateRegisterAsync(RegisterDto registerDTO)
+        public async Task<List<string>> ValidateRegisterAsync(string name, string email, string phoneNumber, string password)
         {
             var errors = new List<string>();
 
-            if (string.IsNullOrWhiteSpace(registerDTO.FullName))
-                errors.Add("الاسم مطلوب");
+            if (string.IsNullOrWhiteSpace(name))
+                errors.Add("Name is required");
 
-            if (string.IsNullOrWhiteSpace(registerDTO.Email))
-                errors.Add("ايميل غير صالح");
+            if (string.IsNullOrWhiteSpace(email))
+                errors.Add("Invalid Email");
 
-            if (await _userManager.FindByEmailAsync(registerDTO.Email) is not null)
-                errors.Add("هذا الايميل موجود بالفعل");
+            if (await _userManager.FindByEmailAsync(email) is not null)
+                errors.Add("An account with this email already exists.");
 
-            if (string.IsNullOrWhiteSpace(registerDTO.Password))
-                errors.Add("الرقم السري مطلوب");
-            else if (registerDTO.Password.Length < 6)
-                errors.Add("الرقم السري يجب ان يكون 6 احرف على الاقل");
+            if (string.IsNullOrWhiteSpace(password))
+                errors.Add("Password is requied");
+            else if (password.Length < 6)
+                errors.Add("Password must be 6 charachters at least");
 
-            if (string.IsNullOrWhiteSpace(registerDTO.PhoneNumber))
-                errors.Add("رقم الهاتف مطلوب");
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+                errors.Add("Phone neumber is required");
 
-            if (await _userManager.Users.AnyAsync(u => u.PhoneNumber == registerDTO.PhoneNumber))
-                errors.Add("رقم الهاتف موجود بالفعل");
+            if (await _userManager.Users.AnyAsync(u => u.PhoneNumber == phoneNumber))
+                errors.Add("An account with this phone number already exists.");
 
             return errors;
         }
 
-        //public async Task<List<LookUpUsers>> LookUpAllUsers()
-        //{
-        //    var users = await _dbContext.Users
-        //        .AsNoTracking()
-        //        .Select(u => new { u.Id, u.FirstName, u.LastName })
-        //        .ToListAsync();
+        public async Task<List<LookupUsers>> LookupAsync()
+        {
+            var users = await _dbContext.Users
+                .AsNoTracking()
+                .Select(u => new { u.Id, u.FullName })
+                .ToListAsync();
 
-        //    List<LookUpUsers> res = new List<LookUpUsers>();
-        //    foreach (var user in users)
-        //    {
-        //        var rec = new LookUpUsers(user.Id, user.FirstName, user.LastName);
-        //        res.Add(rec);
-        //    }
-        //    return res;
-        //}
+            return _mapper.Map<List<LookupUsers>>(users);
+        }
+
+        public async Task<UserDto> RegisterCustomerAsync(PublicRegister newUser)
+        {
+            var validateErrors = await ValidateRegisterAsync(newUser.FullName, newUser.Email, newUser.PhoneNumber, newUser.Password);
+            if (validateErrors is not null && validateErrors.Count > 0)
+                throw new InvalidOperationException(string.Join(", ", validateErrors));
+
+            using var dbTransaction = await _dbContext.Database.BeginTransactionAsync();
+            try
+            {
+                var user = new AppUser
+                {
+                    FullName = newUser.FullName,
+                    UserName = newUser.PhoneNumber,
+                    Email = newUser.Email,
+                    EmailConfirmed = true,
+                    PhoneNumber = newUser.PhoneNumber,
+                    PhoneNumberConfirmed = true,
+                };
+
+                var result = await _userManager.CreateAsync(user, newUser.Password);
+
+                if (!result.Succeeded)
+                    throw new InvalidOperationException("Failed To Add New User");
+
+                await _userManager.AddToRoleAsync(user, UserRole.Customer.ToString());
+
+                // Notify User with email
+
+                await _dbContext.SaveChangesAsync();
+                await dbTransaction.CommitAsync();
+                Invalidate();
+                return _mapper.Map<UserDto>(user);
+            }
+            catch (Exception)
+            {
+                await dbTransaction.RollbackAsync();
+                throw;
+            }
+        }
     }
 }

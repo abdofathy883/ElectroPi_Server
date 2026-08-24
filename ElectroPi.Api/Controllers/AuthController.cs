@@ -33,11 +33,31 @@ namespace ElectroPi.Api.Controllers
                 return BadRequest(ex.Message);
             }
         }
-        [HttpPost("register")]
-        public async Task<IActionResult> RegisterAsync(RegisterDto request)
+
+        [AllowAnonymous]
+        [EnableRateLimiting("contact-limit")]
+        [HttpPost]
+        [Route("register")]
+        public async Task<IActionResult> RegisterAsync(PublicRegister request)
         {
             if (request is null)
                 return BadRequest("بيانات المستخدم غير صحيحة");
+            try
+            {
+                var result = await _authService.RegisterCustomerAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("users")]
+        public async Task<IActionResult> RegisterAsync(RegisterDto request)
+        {
+            if (request is null)
+                return BadRequest("Invalid User's data");
             try
             {
                 var result = await _authService.RegisterAsync(request);
@@ -48,6 +68,7 @@ namespace ElectroPi.Api.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
         [HttpGet("users")]
         public async Task<IActionResult> GetAllUsersAsync()
         {
@@ -86,7 +107,6 @@ namespace ElectroPi.Api.Controllers
             }
         }
 
-        
         [HttpDelete("{userId}")]
         public async Task<IActionResult> DeleteUserAsync(string userId)
         {
@@ -104,6 +124,12 @@ namespace ElectroPi.Api.Controllers
             }
         }
 
-        
+        [HttpGet("lookup")]
+        //[Route]
+        public async Task<IActionResult> Lookup()
+        {
+            var result = await _authService.LookupAsync();
+            return Ok(result);
+        }
     }
 }
