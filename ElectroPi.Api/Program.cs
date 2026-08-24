@@ -1,5 +1,6 @@
 using AutoMapper;
 using ElectroPi.Api.Extentions;
+using ElectroPi.Api.Middlewares;
 using ElectroPi.Application.MappingProfiles;
 using ElectroPi.Domain.Entities;
 using ElectroPi.Domain.Options;
@@ -11,8 +12,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,17 +61,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddRateLimiter(options =>
-{
-    options.AddFixedWindowLimiter("contact-limit", config =>
-    {
-        config.PermitLimit = 5;
-        config.Window = TimeSpan.FromMinutes(1);
-        config.QueueLimit = 3;
-    });
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-});
-
 builder.Services.AddApplicationServices();
 
 builder.Services.AddAutoMapper(cfg =>
@@ -82,6 +74,20 @@ builder.Services.AddAutoMapper(cfg =>
         cfg.AddProfile(profileType);
     }
 });
+
+Log.Logger = new LoggerConfiguration()
+.MinimumLevel.Information()
+.MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+.MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+.WriteTo.Console()
+.WriteTo.File("logs/log-.txt",
+    rollingInterval: RollingInterval.Day,
+    fileSizeLimitBytes: 20_000_000,
+    retainedFileCountLimit: 7,
+    rollOnFileSizeLimit: true)
+.CreateLogger();
+
+builder.Host.UseSerilog();
 
 builder.Services.AddCors(options =>
 {
@@ -97,14 +103,38 @@ builder.Services.AddCors(options =>
 
     options.AddPolicy("dev", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+            "http://localhost:4200"
+        )
         .AllowAnyMethod()
-        .AllowAnyHeader();
+        .AllowAnyHeader()
+        .AllowCredentials();
     });
 });
 
 
 builder.Services.AddControllers();
+builder.Services.AddOpenApi();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("fixed", httpContext =>
+
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.Identity?.Name
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "anon",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }
+        )
+    );
+});
 
 builder.Services.AddAuthorization(options =>
 {
@@ -116,16 +146,24 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 // Configure the HTTP request pipeline.
+app.UseRouting();
+
 if (app.Environment.IsDevelopment())
 {
+    app.MapOpenApi();
     app.UseCors("dev");
 }
-app.UseRouting();
-app.UseRateLimiter();
-app.UseCors("prod");
+else
+{
+    app.UseCors("prod");
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 
@@ -135,7 +173,7 @@ using (var scope = app.Services.CreateScope())
     var dbContext = services.GetRequiredService<AppDbContext>();
     await dbContext.Database.MigrateAsync();
     await AuthSeeder.SeedAsync(services);
-    //await DbSeeder.SeedAsync(services);
+    await DbSeeder.SeedAsync(services);
 }
 
 app.Run();

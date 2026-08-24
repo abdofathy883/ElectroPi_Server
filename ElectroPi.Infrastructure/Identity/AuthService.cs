@@ -4,6 +4,7 @@ using ElectroPi.Application.Dtos.Auth;
 using ElectroPi.Application.Interfaces;
 using ElectroPi.Domain.Entities;
 using ElectroPi.Domain.Enums;
+using ElectroPi.Domain.Exceptions;
 using ElectroPi.Infrastructure.Persistance;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -135,14 +136,11 @@ namespace Infrastructure.Identity
             }
             else
             {
-                var RefreshToken = await _jwtServices.GenerateRefreshTokenAsync();
-                authDTO.RefreshToken = RefreshToken.Token;
-                authDTO.RefreshTokenExpiration = RefreshToken.ExpiresOn;
-                user.RefreshTokens.Add(RefreshToken);
-                //using (AuditContext.BeginScope(suppress: true))
-                //{
-                //    await _userManager.UpdateAsync(user);
-                //}
+                var newRefreshToken = await _jwtServices.GenerateRefreshTokenAsync();
+                authDTO.RefreshToken = newRefreshToken.Token;
+                authDTO.RefreshTokenExpiration = newRefreshToken.ExpiresOn;
+                user.RefreshTokens.Add(newRefreshToken);
+                await _userManager.UpdateAsync(user);
             }
 
             //await loginLogService.LogActionAsync("User", "Login", user.Id, user.Email ?? user.UserName ?? "unknown");
@@ -150,6 +148,73 @@ namespace Infrastructure.Identity
             authDTO.Message = "تم تسجيل الدخول بنجاح";
             return authDTO;
         }
+        public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+                throw new UnauthorizedAccessException("Invalid refresh token.");
+
+            var user = await _dbContext.Users
+                .SingleOrDefaultAsync(u => u.RefreshTokens.Any(rt => rt.Token == refreshToken));
+
+            if (user is null)
+                throw new UnauthorizedAccessException("Invalid refresh token.");
+
+            var oldRefreshToken = user.RefreshTokens.Single(rt => rt.Token == refreshToken);
+
+            if (!oldRefreshToken.IsActive)
+                throw new UnauthorizedAccessException("Refresh token is expired or has been revoked.");
+
+            // Rotate: revoke the used token and issue a fresh one so a stolen token can only be replayed once.
+            oldRefreshToken.RevokedOn = DateTime.UtcNow;
+
+            var newRefreshToken = await _jwtServices.GenerateRefreshTokenAsync();
+            user.RefreshTokens.Add(newRefreshToken);
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+                throw new InvalidOperationException("Failed to refresh the session.");
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var accessToken = await _jwtServices.GenerateAccessTokenAsync(user);
+
+            return new AuthResponseDto
+            {
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                PhoneNumber = user.PhoneNumber,
+                UserName = user.UserName,
+                Roles = roles.ToList(),
+                IsAuthenticated = true,
+                Token = accessToken,
+                RefreshToken = newRefreshToken.Token,
+                RefreshTokenExpiration = newRefreshToken.ExpiresOn,
+                Message = "تم تجديد الجلسة بنجاح"
+            };
+        }
+
+        public async Task<bool> RevokeTokenAsync(string refreshToken)
+        {
+            if (string.IsNullOrWhiteSpace(refreshToken))
+                throw new UnauthorizedAccessException("Invalid refresh token.");
+
+            var user = await _dbContext.Users
+                .SingleOrDefaultAsync(u => u.RefreshTokens.Any(rt => rt.Token == refreshToken));
+
+            if (user is null)
+                throw new UnauthorizedAccessException("Invalid refresh token.");
+
+            var token = user.RefreshTokens.Single(rt => rt.Token == refreshToken);
+
+            if (!token.IsActive)
+                throw new UnauthorizedAccessException("Refresh token is expired or has been revoked.");
+
+            token.RevokedOn = DateTime.UtcNow;
+
+            var result = await _userManager.UpdateAsync(user);
+            return result.Succeeded;
+        }
+
         public async Task<UserDto> RegisterAsync(RegisterDto newUser)
         {
             var validateErrors = await ValidateRegisterAsync(newUser.FullName, newUser.Email, newUser.PhoneNumber, newUser.Password);
@@ -196,8 +261,13 @@ namespace Infrastructure.Identity
             }
         }
 
-        public async Task<UserDto> UpdateAsync(UpdateUserDto updatedUser)
+        public async Task<UserDto> UpdateAsync(UpdateUserDto updatedUser, string currentUserId, string currentUserRole)
         {
+            var isAdmin = currentUserRole == UserRole.Admin.ToString();
+
+            if (!isAdmin && updatedUser.Id != currentUserId)
+                throw new ForbiddenException("You can only update your own account.");
+
             var user = await _userManager.FindByIdAsync(updatedUser.Id)
                 ?? throw new KeyNotFoundException("لم يتم العثور على المستخدم");
 
@@ -223,16 +293,15 @@ namespace Infrastructure.Identity
                 user.PhoneNumberConfirmed = true;
             }
 
-            var userRoles = await _userManager.GetRolesAsync(user);
-
-            // before calling userManager.UpdateAsync(user)
-
-            // Add new primary role
-            var addResult = await _userManager.AddToRoleAsync(user, updatedUser.Role.ToString());
-            if (!addResult.Succeeded)
+            // Only an Admin may change a user's role, and only when one was actually submitted.
+            if (isAdmin && updatedUser.Role.HasValue)
             {
-                var errors = string.Join(", ", addResult.Errors.Select(e => e.Description));
-                throw new InvalidOperationException($"Failed to add role '{updatedUser.Role.ToString()}': {errors}");
+                var addResult = await _userManager.AddToRoleAsync(user, updatedUser.Role.Value.ToString());
+                if (!addResult.Succeeded)
+                {
+                    var errors = string.Join(", ", addResult.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException($"Failed to add role '{updatedUser.Role}': {errors}");
+                }
             }
 
             var result = await _userManager.UpdateAsync(user);

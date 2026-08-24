@@ -2,6 +2,7 @@
 using ElectroPi.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace ElectroPi.Api.Controllers
@@ -9,6 +10,7 @@ namespace ElectroPi.Api.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Roles = "Admin, Agent")]
+    [EnableRateLimiting("fixed")]
     public class TicketLogController : ControllerBase
     {
         private readonly ITicketLogService _ticketLogService;
@@ -30,15 +32,8 @@ namespace ElectroPi.Api.Controllers
         public async Task<IActionResult> Log(LogTimeEntryDto request)
         {
             var userId = GetUserId();
-            try
-            {
-                var result = await _ticketLogService.LogAsync(request, userId);
-                return Ok(result);
-            }
-            catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _ticketLogService.LogAsync(request, userId);
+            return Ok(result);
         }
 
         private string GetUserId() =>

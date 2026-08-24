@@ -5,17 +5,20 @@ using ElectroPi.Application.Interfaces;
 using ElectroPi.Domain.Entities;
 using ElectroPi.Infrastructure.Persistance;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace ElectroPi.Infrastructure.Services.Tickets
 {
     public class TicketLogService : ITicketLogService
     {
         private readonly AppDbContext _dbContext;
+        private readonly ILogger<TicketLogService> _logger;
         private readonly IMapper _mapper;
 
-        public TicketLogService(AppDbContext dbContext, IMapper mapper)
+        public TicketLogService(AppDbContext dbContext, ILogger<TicketLogService> logger, IMapper mapper)
         {
             _dbContext = dbContext;
+            _logger = logger;
             _mapper = mapper;
         }
 
@@ -43,6 +46,7 @@ namespace ElectroPi.Infrastructure.Services.Tickets
 
             await _dbContext.TimeEntries.AddAsync(log);
             await _dbContext.SaveChangesAsync();
+            _logger.LogInformation("Time entry {TimeEntryId} logged for ticket {TicketId} by agent {AgentId} ({DurationMinutes} minutes)", log.Id, request.TicketId, agentId, request.DurationMinutes);
             return _mapper.Map<TimeEntryDto>(log);
         }
     }

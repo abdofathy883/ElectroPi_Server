@@ -13,7 +13,8 @@ namespace ElectroPi.Application.MappingProfiles
         {
             CreateMap<Ticket, TicketDto>()
                 .ForMember(dest => dest.CustomerName, opt => opt.MapFrom(src => src.Customer.FullName))
-                .ForMember(dest => dest.AgentName, opt => opt.MapFrom(src => src.Agent.FullName));
+                .ForMember(dest => dest.AgentName, opt => opt.MapFrom(src => src.Agent.FullName))
+                .ForMember(dest => dest.TicketActivities, opt => opt.MapFrom(src => src.Activities));
 
             CreateMap<TicketComment, TicketCommentDto>();
 

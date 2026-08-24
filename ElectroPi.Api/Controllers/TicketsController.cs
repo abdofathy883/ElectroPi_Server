@@ -5,6 +5,7 @@ using ElectroPi.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace ElectroPi.Api.Controllers
@@ -12,6 +13,7 @@ namespace ElectroPi.Api.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
+    [EnableRateLimiting("fixed")]
     public class TicketsController : ControllerBase
     {
         private readonly ITicketService _ticketService;
@@ -34,7 +36,8 @@ namespace ElectroPi.Api.Controllers
         [Route("ticket/{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _ticketService.GetByIdAsync(id);
+            var userId = GetUserId();
+            var result = await _ticketService.GetByIdAsync(id, userId);
             return Ok(result);
         }
 
@@ -42,29 +45,18 @@ namespace ElectroPi.Api.Controllers
         [Route("ticket")]
         public async Task<IActionResult> Create(CreateUpdateTicket request)
         {
-            try
-            {
-                var result = await _ticketService.CreateAsync(request);
-                return Ok(result);
-            }
-            catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var userId = GetUserId();
+            var result = await _ticketService.CreateAsync(request, userId);
+            return Ok(result);
         }
 
         [HttpPut]
-        public async Task<IActionResult> Update(CreateUpdateTicket request)
+        [Route("{id}")]
+        public async Task<IActionResult> Update(int id, CreateUpdateTicket request)
         {
-            try
-            {
-                var result = await _ticketService.UpdateAsync(request);
-                return Ok(result);
-            }
-            catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var userId = GetUserId();
+            var result = await _ticketService.UpdateAsync(id, request, userId);
+            return Ok(result);
         }
 
         [HttpPatch]
@@ -72,15 +64,8 @@ namespace ElectroPi.Api.Controllers
         public async Task<IActionResult> ChangeStatus(int id, TicketStatus status)
         {
             var userId = GetUserId();
-            try
-            {
-                var result = await _ticketService.ChangeStatusAsync(id, status, userId);
-                return Ok(result);
-            }
-            catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _ticketService.ChangeStatusAsync(id, status, userId);
+            return Ok(result);
         }
 
         [HttpGet]
@@ -94,32 +79,20 @@ namespace ElectroPi.Api.Controllers
 
         [HttpDelete]
         [Route("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
-            try
-            {
-                var result = await _ticketService.DeleteAsync(id);
-                return Ok(result);
-            }
-            catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _ticketService.DeleteAsync(id);
+            return Ok(result);
         }
 
         [HttpPost]
         [Route("comment")]
         public async Task<IActionResult> CreateComment(CreateTicketCommentDto request)
         {
-            try
-            {
-                var result = await _ticketService.CreateCommentAsync(request);
-                return Ok(result);
-            }
-            catch(Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var userId = GetUserId();
+            var result = await _ticketService.CreateCommentAsync(request, userId);
+            return Ok(result);
         }
         private string GetUserId() =>
             User.FindFirstValue(ClaimTypes.NameIdentifier)

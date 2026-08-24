@@ -9,6 +9,7 @@ namespace ElectroPi.Api.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
+    [EnableRateLimiting("fixed")]
     public class PasswordController : ControllerBase
     {
         private readonly IPasswordService _passwordService;
@@ -27,15 +28,8 @@ namespace ElectroPi.Api.Controllers
             if (changePasswordDTO.NewPassword != changePasswordDTO.ConfirmNewPassword)
                 return BadRequest();
 
-            try
-            {
-                var result = await _passwordService.ChangePasswordAsync(changePasswordDTO);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var result = await _passwordService.ChangePasswordAsync(changePasswordDTO);
+            return Ok(result);
         }
     }
 }

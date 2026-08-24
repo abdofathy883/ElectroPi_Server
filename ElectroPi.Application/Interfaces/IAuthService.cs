@@ -9,7 +9,9 @@ namespace ElectroPi.Application.Interfaces
         Task<UserDto> RegisterAsync(RegisterDto newUser);
         Task<UserDto> RegisterCustomerAsync(PublicRegister newUser);
         Task<AuthResponseDto> LoginAsync(LoginDto login);
-        Task<UserDto> UpdateAsync(UpdateUserDto updatedUser);
+        Task<AuthResponseDto> RefreshTokenAsync(string refreshToken);
+        Task<bool> RevokeTokenAsync(string refreshToken);
+        Task<UserDto> UpdateAsync(UpdateUserDto updatedUser, string currentUserId, string currentUserRole);
         Task<bool> DeleteAsync(string userId);
         Task<List<LookupUsers>> LookupAsync();
     }

@@ -46,7 +46,7 @@ namespace Infrastructure.Identity
                issuer: _jwtSettings.Issuer,
                audience: _jwtSettings.Audience,
                claims: claims,
-               expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationMinutes + 60),
+               expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationMinutes),
                signingCredentials: signingCredentials
             );
 

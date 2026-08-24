@@ -3,16 +3,19 @@ using ElectroPi.Domain.Entities;
 using ElectroPi.Domain.Enums;
 using ElectroPi.Infrastructure.Persistance;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace ElectroPi.Infrastructure.Services.Tickets
 {
     public class TicketHelperService
     {
         private readonly AppDbContext _dbContext;
+        private readonly ILogger<TicketHelperService> _logger;
 
-        public TicketHelperService(AppDbContext dbContext)
+        public TicketHelperService(AppDbContext dbContext, ILogger<TicketHelperService> logger)
         {
             _dbContext = dbContext;
+            _logger = logger;
         }
 
         public async Task CreateTicketActivity(Ticket ticket, string userId, TicketActivityType type, string oldValue, string newValue, string userName)
@@ -28,6 +31,7 @@ namespace ElectroPi.Infrastructure.Services.Tickets
             };
             ticket.Activities.Add(activity);
             await _dbContext.TicketActivities.AddAsync(activity);
+            _logger.LogInformation("Ticket activity {ActivityType} recorded for ticket {TicketId} by user {UserId}", type, ticket.Id, userId);
         }
 
         public IQueryable<Ticket> FilterTasks(IQueryable<Ticket> query, TicketFilterDto filter, string role, string currentUserId)
