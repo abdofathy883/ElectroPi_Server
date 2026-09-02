@@ -21,9 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ElectroPi.Application\ElectroPi.Application.csproj" />
-    <ProjectReference Include="..\ElectroPi.Domain\ElectroPi.Domain.csproj" />
-    <ProjectReference Include="..\ElectroPi.Infrastructure\ElectroPi.Infrastructure.csproj" />
+    <ProjectReference Include="..\TMS.Application\TMS.Application.csproj" />
+    <ProjectReference Include="..\TMS.Domain\TMS.Domain.csproj" />
+    <ProjectReference Include="..\TMS.Infrastructure\TMS.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

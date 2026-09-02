@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ElectroPi.Domain\ElectroPi.Domain.csproj" />
+    <ProjectReference Include="..\TMS.Domain\TMS.Domain.csproj" />
   </ItemGroup>
 
 </Project>

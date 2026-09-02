@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="TMS.Api/TMS.Api.csproj" />
+  <Project Path="TMS.Application/TMS.Application.csproj" />
+  <Project Path="TMS.Domain/TMS.Domain.csproj" />
+  <Project Path="TMS.Infrastructure/TMS.Infrastructure.csproj" />
+  <Project Path="TMS.Tests/TMS.Tests.csproj" />
+</Solution>
