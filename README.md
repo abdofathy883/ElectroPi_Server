@@ -1,6 +1,6 @@
-# ElectroPi.Server
+# TicketManagementSystem.Server
 
-Backend API for the **ElectroPi Support Ticket Management System** — a technical assessment project implementing multi-role ticket tracking (Admin / Support Agent / Customer) with JWT authentication, strict data isolation, comment & activity timelines, time tracking, and a reporting dashboard.
+Backend API for the **Support Ticket Management System** — a technical assessment project implementing multi-role ticket tracking (Admin / Support Agent / Customer) with JWT authentication, strict data isolation, comment & activity timelines, time tracking, and a reporting dashboard.
 
 Built with **ASP.NET Core 10 Web API**, **EF Core 10 / SQL Server**, **ASP.NET Core Identity**, and a layered **Clean Architecture** (Domain → Application → Infrastructure → Api).
 
@@ -34,25 +34,25 @@ The solution follows a **four-project layered/clean architecture**, keeping the 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ElectroPi.Api            Controllers, middleware, DI wiring,│
+│  TMS.Api            Controllers, middleware, DI wiring,│
 │                            JWT/CORS/rate-limit configuration  │
 ├─────────────────────────────────────────────────────────────┤
-│  ElectroPi.Infrastructure  EF Core DbContext, Identity, JWT   │
+│  TMS.Infrastructure  EF Core DbContext, Identity, JWT   │
 │                            issuing, service implementations,  │
 │                            entity configs, migrations, seeders│
 ├─────────────────────────────────────────────────────────────┤
-│  ElectroPi.Application     DTOs, service interfaces,          │
+│  TMS.Application     DTOs, service interfaces,          │
 │                            AutoMapper profiles (no EF types    │
 │                            ever cross this boundary)           │
 ├─────────────────────────────────────────────────────────────┤
-│  ElectroPi.Domain           Entities, enums, custom exceptions,│
+│  TMS.Domain           Entities, enums, custom exceptions,│
 │                            options — zero external dependencies│
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Dependency rule:** `Api → Infrastructure → Application → Domain`. Domain has no reference to EF Core beyond abstractions; Application never references Infrastructure or the Api layer. Controllers depend only on `Application` interfaces (`ITicketService`, `IAuthService`, …), never on Infrastructure implementations directly — implementations are wired through `AddApplicationServices()` in `ServiceExtention.cs`.
 
-`ElectroPi.Tests` references Application/Domain/Infrastructure directly and exercises the service layer against a real SQL Server database (see [Testing](#testing)).
+`TMS.Tests` references Application/Domain/Infrastructure directly and exercises the service layer against a real SQL Server database (see [Testing](#testing)).
 
 ## Tech Stack
 
@@ -100,14 +100,14 @@ Every status change, priority change, agent (re)assignment and comment is record
 
 ```bash
 # from the repository root
-cd ElectroPi_Server
+cd TicketManagementSystem_Server
 
 # restore & build
 dotnet restore
 dotnet build
 
 # apply migrations & seed data, then run the API
-dotnet run --project ElectroPi.Api
+dotnet run --project TMS.Api
 ```
 
 On first run, `Program.cs` automatically:
@@ -126,17 +126,17 @@ With `ASPNETCORE_ENVIRONMENT=Development`, the raw OpenAPI document is available
 
 ## Configuration
 
-Settings live in `ElectroPi.Api/appsettings.json` (and `appsettings.Development.json` for local overrides):
+Settings live in `TMS.Api/appsettings.json` (and `appsettings.Development.json` for local overrides):
 
 ```jsonc
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=<your-server>;Database=ElectroPi;Trusted_Connection=True;Encrypt=False;TrustServerCertificate=True"
+    "DefaultConnection": "Server=<your-server>;Database=TMS;Trusted_Connection=True;Encrypt=False;TrustServerCertificate=True"
   },
   "Jwt": {
     "Key": "<replace-with-a-strong-secret>",
-    "Issuer": "ElectroPi",
-    "Audience": "ElectroPi",
+    "Issuer": "TMS",
+    "Audience": "TMS",
     "ExpirationMinutes": 60,
     "RefreshTokenExpirationDays": 10
   }
@@ -149,12 +149,12 @@ CORS is pre-configured with two named policies switched by environment: `dev` (`
 
 ## Database & Seed Data
 
-Migrations live in `ElectroPi.Infrastructure/Migrations` and are applied automatically on startup — no manual `dotnet ef database update` step is required for local development. To manage migrations manually:
+Migrations live in `TMS.Infrastructure/Migrations` and are applied automatically on startup — no manual `dotnet ef database update` step is required for local development. To manage migrations manually:
 
 ```bash
-cd ElectroPi_Server
-dotnet ef migrations add <Name> --project ElectroPi.Infrastructure --startup-project ElectroPi.Api
-dotnet ef database update --project ElectroPi.Infrastructure --startup-project ElectroPi.Api
+cd TicketManagementSystem_Server
+dotnet ef migrations add <Name> --project TMS.Infrastructure --startup-project TMS.Api
+dotnet ef database update --project TMS.Infrastructure --startup-project TMS.Api
 ```
 
 ### Seeded test accounts
@@ -264,10 +264,10 @@ A ready-to-import **Postman collection** / the raw OpenAPI JSON is the authorita
 
 ## Testing
 
-Tests live in `ElectroPi.Tests` (xUnit + Moq) and exercise `TicketService` and its collaborators **against a real, disposable SQL Server database** (`SqlServerTestDatabaseFixture`) rather than an in-memory provider — this catches issues (SQL-specific behavior, `GETUTCDATE()`, identity columns, EF query translation) that an in-memory/mocked context would silently paper over. The fixture creates a dedicated `ElectroPi_Tests` database, drops and recreates the schema before the run, and tears it down after. Point it at a different instance (e.g. in CI) via the `ELECTROPI_TEST_CONNECTION_STRING` environment variable.
+Tests live in `TMS.Tests` (xUnit + Moq) and exercise `TicketService` and its collaborators **against a real, disposable SQL Server database** (`SqlServerTestDatabaseFixture`) rather than an in-memory provider — this catches issues (SQL-specific behavior, `GETUTCDATE()`, identity columns, EF query translation) that an in-memory/mocked context would silently paper over. The fixture creates a dedicated `TMS_Tests` database, drops and recreates the schema before the run, and tears it down after. Point it at a different instance (e.g. in CI) via the `TMS_TEST_CONNECTION_STRING` environment variable.
 
 ```bash
-cd ElectroPi_Server
+cd TicketManagementSystem_Server
 dotnet test
 ```
 
@@ -307,22 +307,22 @@ Coverage focuses on the business rules that matter most for this domain:
 ## Project Structure
 
 ```
-ElectroPi_Server/
-├── ElectroPi.Api/                  # Controllers, Program.cs, middleware, DI extensions
+TicketManagementSystem_Server/
+├── TMS.Api/                  # Controllers, Program.cs, middleware, DI extensions
 │   ├── Controllers/
 │   ├── Extentions/ServiceExtention.cs
 │   └── Middlewares/ExceptionHandlingMiddleware.cs
-├── ElectroPi.Application/          # DTOs, service interfaces, AutoMapper profiles
+├── TMS.Application/          # DTOs, service interfaces, AutoMapper profiles
 │   ├── Dtos/{Auth,Password,Tickets}/
 │   ├── Interfaces/
 │   └── MappingProfiles/
-├── ElectroPi.Domain/                # Entities, Enums, Exceptions, Options — no EF/ASP.NET deps
-├── ElectroPi.Infrastructure/        # EF Core DbContext, Identity, JWT issuing, service impls
+├── TMS.Domain/                # Entities, Enums, Exceptions, Options — no EF/ASP.NET deps
+├── TMS.Infrastructure/        # EF Core DbContext, Identity, JWT issuing, service impls
 │   ├── Identity/ (AuthService, JwtService, PasswordService, AuthSeeder)
 │   ├── Migrations/
 │   ├── Persistance/ (AppDbContext, DbSeeder, EntityConfig/)
 │   └── Services/Tickets/ (TicketService, TicketLogService, TicketReportingService, TicketHelperService)
-└── ElectroPi.Tests/                 # xUnit + Moq, real-SQL-Server integration-style tests
+└── TMS.Tests/                 # xUnit + Moq, real-SQL-Server integration-style tests
 ```
 
 ## Assumptions & Known Limitations
